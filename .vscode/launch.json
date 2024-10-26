@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "rotate_secret",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=rotate_secret",
+          "--package=tracing-examples"
+        ],
+        "filter": {
+          "name": "rotate_secret",
+          "kind": "example"
+        }
+      },
+      "args": [
+        "foo",
+        "secret"
+      ],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
