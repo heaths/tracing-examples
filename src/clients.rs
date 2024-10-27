@@ -7,7 +7,7 @@ use crate::{
 };
 use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time::sleep};
-use tracing::instrument;
+use tracing::{info_span, Instrument};
 use url::Url;
 
 pub struct ExampleClient {
@@ -27,28 +27,53 @@ impl ExampleClient {
         &self.endpoint
     }
 
-    #[instrument(target = "ExampleClient::get_model", skip_all, fields(name), err)]
     pub async fn get_model(&self, name: &str) -> Result<Model> {
-        sleep(Duration::from_millis(100)).await;
-        let models = self.models.lock().await;
-        let Some(model) = models.get(name) else {
-            return Err(ErrorKind::http_response(404, None).into());
-        };
+        let mut span = tracing::Span::current();
+        if span
+            .field("client")
+            .is_none_or(|name| name.name() == "ExampleClient")
+        {
+            span = info_span!(target: "ExampleClient::get_model", "get_model", client = "ExampleClient");
+        }
+        async move {
+            sleep(Duration::from_millis(100)).await;
+            let models = self.models.lock().await;
+            let Some(model) = models.get(name) else {
+                return Err(ErrorKind::http_response(404, None).into());
+            };
 
-        Ok(model.clone())
+            Ok(model.clone())
+        }
+        .instrument(span)
+        .await
+        .inspect_err(|err|
+            tracing::error!(name: "get_model", target: "ExampleClient::get_model", error = %err)
+        )
     }
 
-    #[instrument(target = "ExampleClient::create_or_update_model", skip_all, fields( name = model.name ), err)]
     pub async fn create_or_update_model(&self, model: Model) -> Result<Model> {
-        sleep(Duration::from_millis(300)).await;
-        let Some(name) = model.name.as_ref() else {
-            return Err(ErrorKind::http_response(400, None).into());
-        };
+        let mut span = tracing::Span::current();
+        if span
+            .field("client")
+            .is_none_or(|name| name.name() == "ExampleClient")
+        {
+            span = info_span!(target: "ExampleClient::create_or_update_model", "create_or_update_model", client = "ExampleClient");
+        }
+        async move {
+            sleep(Duration::from_millis(300)).await;
+            let Some(name) = model.name.as_ref() else {
+                return Err(ErrorKind::http_response(400, None).into());
+            };
 
-        let mut models = self.models.lock().await;
-        models.insert(name.clone(), model.clone());
+            let mut models = self.models.lock().await;
+            models.insert(name.clone(), model.clone());
 
-        Ok(model)
+            Ok(model)
+        }.instrument(span)
+        .await
+        .inspect_err(|err|
+            tracing::error!(name: "create_or_update_model", target: "ExampleClient::create_or_update_model", error = %err)
+        )
     }
 }
 
