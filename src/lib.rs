@@ -17,9 +17,13 @@ pub trait ExampleClientExt: private::Sealed {
 }
 
 impl ExampleClientExt for ExampleClient {
+    #[tracing::instrument(
+        name = "rotate",
+        target = "ExampleClient::rotate",
+        skip_all,
+        fields(client = "ExampleClient")
+    )]
     async fn rotate<S: Into<Secret>>(&self, name: &str, secret: S) -> Result<Model> {
-        let _span = tracing::info_span!(target: "ExampleClient::rotate", "rotate", client = "ExampleClient").entered();
-
         let mut m = self.get_model(name).await?;
 
         tracing::event!(Level::DEBUG, "rotate secret");
