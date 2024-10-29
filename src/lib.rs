@@ -18,10 +18,10 @@ pub trait ExampleClientExt: private::Sealed {
 
 impl ExampleClientExt for ExampleClient {
     #[tracing::instrument(
-        name = "rotate",
+        "rotate",
         target = "ExampleClient::rotate",
         skip_all,
-        fields(client = "ExampleClient")
+        fields(self = self.as_value())
     )]
     async fn rotate<S: Into<Secret>>(&self, name: &str, secret: S) -> Result<Model> {
         let mut m = self.get_model(name).await?;
