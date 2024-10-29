@@ -9,6 +9,7 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time::sleep};
 use tracing::{info_span, Instrument};
 use url::Url;
+use valuable::{Fields, NamedField, NamedValues, Structable, Valuable};
 
 pub struct ExampleClient {
     endpoint: Url,
@@ -16,6 +17,8 @@ pub struct ExampleClient {
 }
 
 impl ExampleClient {
+    const NAMESPACE: &str = "Microsoft.Example";
+
     pub fn new(endpoint: impl AsRef<str>) -> Result<Self> {
         Ok(Self {
             endpoint: Url::parse(endpoint.as_ref())?,
@@ -30,10 +33,11 @@ impl ExampleClient {
     pub async fn get_model(&self, name: &str) -> Result<Model> {
         let mut span = tracing::Span::current();
         if span
-            .field("client")
-            .is_none_or(|name| name.name() == "ExampleClient")
+            .field(AZ_CLIENT_FIELD.name())
+            .is_none_or(|name| name.name() == stringify!(ExampleClient))
         {
-            span = info_span!(target: "ExampleClient::get_model", "get_model", client = "ExampleClient");
+            span =
+                info_span!(target: "ExampleClient::get_model", "get_model", self = self.as_value());
         }
         async move {
             sleep(Duration::from_millis(100)).await;
@@ -54,10 +58,10 @@ impl ExampleClient {
     pub async fn create_or_update_model(&self, model: Model) -> Result<Model> {
         let mut span = tracing::Span::current();
         if span
-            .field("client")
-            .is_none_or(|name| name.name() == "ExampleClient")
+            .field(AZ_CLIENT_FIELD.name())
+            .is_none_or(|name| name.name() == stringify!(ExampleClient))
         {
-            span = info_span!(target: "ExampleClient::create_or_update_model", "create_or_update_model", client = "ExampleClient");
+            span = info_span!(target: "ExampleClient::create_or_update_model", "create_or_update_model", self = self.as_value());
         }
         async move {
             sleep(Duration::from_millis(300)).await;
@@ -75,6 +79,10 @@ impl ExampleClient {
             tracing::error!(name: "create_or_update_model", target: "ExampleClient::create_or_update_model", error = %err)
         )
     }
+
+    pub(crate) fn as_value(&self) -> valuable::Value<'_> {
+        tracing::field::valuable(self)
+    }
 }
 
 impl fmt::Debug for ExampleClient {
@@ -82,5 +90,31 @@ impl fmt::Debug for ExampleClient {
         f.debug_struct("ExampleClient")
             .field("endpoint", &self.endpoint)
             .finish()
+    }
+}
+
+impl Valuable for ExampleClient {
+    fn as_value(&self) -> valuable::Value<'_> {
+        valuable::Value::Structable(self)
+    }
+
+    fn visit(&self, visit: &mut dyn valuable::Visit) {
+        visit.visit_named_fields(&NamedValues::new(
+            FIELDS,
+            &[
+                stringify!(ExampleClient).as_value(),
+                Self::NAMESPACE.as_value(),
+            ],
+        ));
+    }
+}
+
+pub(crate) const AZ_CLIENT_FIELD: NamedField = NamedField::new("az.client");
+pub(crate) const AZ_NAMESPACE_FIELD: NamedField = NamedField::new("az.namespace");
+static FIELDS: &[NamedField<'static>] = &[AZ_CLIENT_FIELD, AZ_NAMESPACE_FIELD];
+
+impl Structable for ExampleClient {
+    fn definition(&self) -> valuable::StructDef<'_> {
+        valuable::StructDef::new_static(stringify!(ExampleClient), Fields::Named(FIELDS))
     }
 }
